@@ -103,8 +103,6 @@ def create_finish_page():
         json_attachment=st.session_state.user_responses.to_json(orient="records"),
     )
 
-    st.write(st.session_state.user_responses)
-
 
 def authenticate(password):
     if password == st.secrets.access_credentials.password:
