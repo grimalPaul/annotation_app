@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "annotation-app"
+version = "0.1.0"
+description = ""
+authors = ["None"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+streamlit = "^1.38.0"
+pandas = "^2.2.3"
+pysmt = "^0.9.6"
+numpy = "^2.1.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
