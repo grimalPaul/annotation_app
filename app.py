@@ -47,7 +47,9 @@ login_indication = """### 🔒 Login to Access the App"""
 
 text_submit = "Continue"
 
+
 TITLE = st.empty()
+PROGRESSBAR = st.empty()
 DESCRIPITON = st.empty()
 COLS = st.empty()
 RADIO = st.empty()
@@ -97,6 +99,9 @@ def start_survey():
 
 def create_finish_page():
     TITLE.markdown(finish_indication, unsafe_allow_html=False)
+    PROGRESSBAR.progress(
+        st.session_state.current_question / st.session_state.dataset.get_nquestions()
+    )
     send_email(
         subject="User Evaluation",
         body="Attached is the JSON file with the evaluation",
@@ -136,6 +141,9 @@ def change_caption():
 
 def create_survey_page():
     TITLE.markdown(title_text, unsafe_allow_html=False)
+    PROGRESSBAR.progress(
+        st.session_state.current_question / st.session_state.dataset.get_nquestions()
+    )
     n_images = st.session_state.dataset.get_nb_images(st.session_state.current_question)
     cols = COLS.columns(n_images)
     images, prompt = st.session_state.dataset.get_data_question(

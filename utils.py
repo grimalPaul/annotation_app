@@ -58,3 +58,6 @@ class DataSession:
 
     def get_stage_idquestion(self, idx):
         return self.question_number2stageandindex[idx]
+
+    def get_nquestions(self):
+        return self.nquestions
