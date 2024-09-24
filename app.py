@@ -43,6 +43,8 @@ Please quit when the success message appears.
 Thank you for your participation! 😊
 
 """
+login_indication = """### 🔒 Login to Access the App"""
+
 text_submit = "Continue"
 
 TITLE = st.empty()
@@ -104,6 +106,14 @@ def create_finish_page():
     st.write(st.session_state.user_responses)
 
 
+def authenticate(password):
+    if password == st.secrets.access_credentials.password:
+        st.session_state.authenticated = True
+        st.success("You have successfully logged in!")
+    else:
+        st.error("Incorrect password. Please try again.")
+
+
 def change_caption():
     idx = st.session_state.choice_val
     n_images = st.session_state.dataset.get_nb_images(st.session_state.current_question)
@@ -133,7 +143,7 @@ def create_survey_page():
     images, prompt = st.session_state.dataset.get_data_question(
         st.session_state.current_question
     )
-    DESCRIPITON.markdown(f"Caption:{prompt}")
+    DESCRIPITON.markdown(f"##### CAPTION : {prompt}")
 
     for (i, col), (hash, image) in zip(enumerate(cols), images.items()):
         with col:
@@ -203,26 +213,33 @@ def submit_clicked():
             st.session_state.end = True
 
 
-if "start" not in st.session_state:
-    st.session_state.start = False
-    st.session_state.end = False
+if "authenticated" not in st.session_state or not st.session_state.authenticated:
+    st.session_state.authenticated = False
+    TITLE.markdown(login_indication, unsafe_allow_html=False)
+    password = DESCRIPITON.text_input("Enter the password", type="password")
+    SUBMIT.button(label="Submit", on_click=authenticate, args=(password,))
 
-if "choice_val" not in st.session_state:
-    st.session_state.choice_val = None  # To store selected image index
-if "user_responses" not in st.session_state:
-    st.session_state.user_responses = pd.DataFrame(
-        columns=["stage", "id_question", "choice"]
-    )
-if "dataset" not in st.session_state:
-    st.session_state.dataset = DataSession(
-        path_guidance=Path("data/w_guidance_eval.pkl"),
-        path_wo_guidance=Path("data/wo_guidance_eval.pkl"),
-    )
-    st.session_state.current_question = 0
-
-if st.session_state.start and not st.session_state.end:
-    create_survey_page()  # If the survey has started, show the survey page
-elif st.session_state.end:
-    create_finish_page()
 else:
-    create_homepage()  # Otherwise, show the homepage
+    if "start" not in st.session_state:
+        st.session_state.start = False
+        st.session_state.end = False
+
+    if "choice_val" not in st.session_state:
+        st.session_state.choice_val = None  # To store selected image index
+    if "user_responses" not in st.session_state:
+        st.session_state.user_responses = pd.DataFrame(
+            columns=["stage", "id_question", "choice"]
+        )
+    if "dataset" not in st.session_state:
+        st.session_state.dataset = DataSession(
+            path_guidance=Path("data/w_guidance_eval.pkl"),
+            path_wo_guidance=Path("data/wo_guidance_eval.pkl"),
+        )
+        st.session_state.current_question = 0
+
+    if st.session_state.start and not st.session_state.end:
+        create_survey_page()  # If the survey has started, show the survey page
+    elif st.session_state.end:
+        create_finish_page()
+    else:
+        create_homepage()  # Otherwise, show the homepage
