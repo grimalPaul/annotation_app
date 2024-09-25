@@ -5,14 +5,10 @@ from email import encoders
 from email.mime.text import MIMEText
 import pandas as pd
 import smtplib
-import numpy as np
 from pathlib import Path
 from utils import DataSession
 
-# import streamlit_authenticator as stauth
 
-label_bad = "bad"
-label_good = "good"
 title_text = "### Text-Image Evaluation"
 chosen_one_label = "🔻"
 text_question = (
