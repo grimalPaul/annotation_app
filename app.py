@@ -62,6 +62,8 @@ def send_email(
     subject,
     body,
     json_attachment,
+    age,
+    expert,
 ):
 
     email_from = st.secrets.email_credentials.email_from
@@ -78,8 +80,10 @@ def send_email(
     part = MIMEBase("application", "octet-stream")
     part.set_payload(json_attachment.encode("utf-8"))
     encoders.encode_base64(part)
-    timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    part.add_header("Content-Disposition", f"attachment; filename={timestamp}.json")
+    filename = (
+        datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + f"_{age}_{expert}"
+    )
+    part.add_header("Content-Disposition", f"attachment; filename={filename}.json")
     msg.attach(part)
 
     try:
@@ -113,6 +117,8 @@ def create_finish_page():
         body=f"""Attached is the JSON file with the evaluation.\nAge: {st.session_state.age}, Expert: {st.session_state.expert}
         """,
         json_attachment=st.session_state.user_responses.to_json(orient="records"),
+        age=st.session_state.age,
+        expert=st.session_state.expert,
     )
 
 
