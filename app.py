@@ -7,7 +7,7 @@ import pandas as pd
 import smtplib
 from pathlib import Path
 from utils import DataSession
-
+import time
 
 title_text = "### Text-Image Evaluation"
 chosen_one_label = "🔻"
@@ -119,6 +119,8 @@ def authenticate(password):
         st.session_state.authenticated = True
         st.toast("You have successfully logged in!")
     else:
+        with st.spinner("Authenticating..."):
+            time.sleep(5)
         st.error("Incorrect password. Please try again.")
 
 
