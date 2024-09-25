@@ -15,34 +15,35 @@ label_bad = "bad"
 label_good = "good"
 title_text = "### Text-Image Evaluation"
 chosen_one_label = "🔻"
-text_question = "Which image best matches the description?"
+text_question = (
+    "Which image(s) best matche(s) the description? Select all that apply or none."
+)
 size_icon = "big"
 stage = ["wo_guidance", "w_guidance"]
 
 homepage_indication = """
 # Welcome to the evaluation of the text-image generation evaluation! 🚀
 
-You will be presented with a description and multiples images. Your task is to select the image that best matches the description. You can also select "equally bad" or "equally good" if you think that none of the images are better than the others. 
+You will be presented with a description and multiples images. Your task is to select the images that best matches the description.
+
+- You can select multiple images if you think they match the description equally well.
+- You can also not select any image if you think none of them match the description.
 
 You can zoom in the images by clicking on the arrows in the top right corner of the image.
 
-You will have two stages to complete. 
+You will have two stages to complete.
 - First one where you will be presented only two images
 - A second one where you will be presented three images. 
 
-
+During the completion of the evaluation, you will not be able to go back to previous questions.
+A progress bar will indicate your progress.
 
 Thank you for your participation! 😊
 """
 
-finish_indication = """
-## The End
-
-Please quit when the success message appears. 
-
-Thank you for your participation! 😊
-
-"""
+finish_indication = """ ### The End"""
+acknowledgment = "Thank you for your participation! 😊"
+warning = "**Please quit when the success message appears.**"
 login_indication = """### 🔒 Login to Access the App"""
 
 text_submit = "Continue"
@@ -51,9 +52,9 @@ text_submit = "Continue"
 TITLE = st.empty()
 PROGRESSBAR = st.empty()
 DESCRIPITON = st.empty()
+CAPTION = st.empty()
 COLS = st.empty()
-RADIO = st.empty()
-STARTINFO = st.empty()
+CHECKBOX = {}
 SUBMIT = st.empty()
 CAPTIONS = {}
 IMAGES = {}
@@ -102,6 +103,8 @@ def create_finish_page():
     PROGRESSBAR.progress(
         st.session_state.current_question / st.session_state.dataset.get_nquestions()
     )
+    DESCRIPITON.markdown(acknowledgment)
+    CAPTION.markdown(warning)
     send_email(
         subject="User Evaluation",
         body="Attached is the JSON file with the evaluation",
@@ -117,26 +120,29 @@ def authenticate(password):
         st.error("Incorrect password. Please try again.")
 
 
+def update_choice_val():
+    choices = []
+    for i in range(
+        st.session_state.dataset.get_nb_images(st.session_state.current_question)
+    ):
+        if st.session_state[f"checkbox_{i}"]:
+            choices.append(i)
+    if len(choices) == 0:
+        choices.append(None)
+    st.session_state.choice_val = choices
+
+
 def change_caption():
-    idx = st.session_state.choice_val
+    update_choice_val()
     n_images = st.session_state.dataset.get_nb_images(st.session_state.current_question)
-    if isinstance(idx, int):
-        for i in range(n_images):
-            if i == idx:
-                CAPTIONS[i].markdown(
-                    f"<div style='text-align: center'> {i}<{size_icon}>{chosen_one_label}</{size_icon}> </div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                CAPTIONS[i].markdown(
-                    f"<div style='text-align: center'> {i} </div>",
-                    unsafe_allow_html=True,
-                )
-    else:
-        for i in range(n_images):
+    for i in range(n_images):
+        if i is not None and i in st.session_state.choice_val:
             CAPTIONS[i].markdown(
-                f"<div style='text-align: center'> {i} </div>", unsafe_allow_html=True
+                f"<div style='text-align: center'><{size_icon}>{chosen_one_label}</{size_icon}> </div>",
+                unsafe_allow_html=True,
             )
+        else:
+            CAPTIONS[i].markdown(f"", unsafe_allow_html=True)
 
 
 def create_survey_page():
@@ -149,32 +155,24 @@ def create_survey_page():
     images, prompt = st.session_state.dataset.get_data_question(
         st.session_state.current_question
     )
-    DESCRIPITON.markdown(f"##### CAPTION : {prompt}")
-
+    DESCRIPITON.markdown(f"{text_question}")
+    CAPTION.markdown(f"CAPTION : **{prompt}**")
     for (i, col), (hash, image) in zip(enumerate(cols), images.items()):
         with col:
-            CAPTIONS[i] = st.markdown(
-                f"<div style='text-align: center'> {i} </div>", unsafe_allow_html=True
-            )
+            CAPTIONS[i] = st.markdown(f"", unsafe_allow_html=True)
             IMAGES[i] = st.image(image)
             ID2HASH[i] = hash
-    RADIO.radio(
-        label=text_question,
-        options=[
-            _
-            for _ in range(
-                st.session_state.dataset.get_nb_images(
-                    st.session_state.current_question
-                )
-            )
-        ]
-        + ["equally bad", "equally good"],
-        horizontal=True,
-        index=None,
-        key="choice_val",
-        on_change=change_caption,
-        args=(),
-    )
+            _, subcol2 = st.columns(2)
+            with subcol2:
+                CHECKBOX[i] = st.container()
+                with CHECKBOX[i]:
+                    st.checkbox(
+                        label=f"{i}",
+                        value=False,
+                        key=f"checkbox_{i}",
+                        on_change=change_caption,
+                        label_visibility="collapsed",
+                    )
     change_caption()
     SUBMIT.button(label=text_submit, on_click=submit_clicked)
 
@@ -191,17 +189,17 @@ def submit_clicked():
         stage, id_question = st.session_state.dataset.get_stage_idquestion(
             st.session_state.current_question
         )
-        if st.session_state.choice_val == "equally bad":
-            choice = label_bad
-        elif st.session_state.choice_val == "equally good":
-            choice = label_good
-        else:
-            choice = ID2HASH[st.session_state.choice_val]
+        final_choices = []
+        for i in st.session_state.choice_val:
+            if i is not None:
+                final_choices.append(ID2HASH[i])
+            else:
+                final_choices.append(None)
         new_entry = pd.DataFrame(
             {
                 "stage": [stage],
                 "id_question": [id_question],
-                "choice": [choice],
+                "choice": [final_choices],
             }
         )
         st.session_state.user_responses = pd.concat(
@@ -213,6 +211,8 @@ def submit_clicked():
         ):
             CAPTIONS[i].empty()
             IMAGES[i].empty()
+            CHECKBOX[i].empty()
+            st.session_state[f"checkbox_{i}"] = False
         st.session_state.current_question += 1
         st.session_state.choice_val = None
         if st.session_state.dataset.get_stop(st.session_state.current_question):
