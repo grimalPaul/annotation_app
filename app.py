@@ -193,7 +193,7 @@ def create_homepage():
     TITLE.markdown(homepage_indication, unsafe_allow_html=False)
     DESCRIPITON.radio(
         question_age,
-        ["< 18", "18-25", "26-35", "36-45", "46-55", "> 55"],
+        ["-18", "18-25", "26-35", "36-45", "46-55", "+55"],
         index=None,
         key="age_radio",
         horizontal=True,
