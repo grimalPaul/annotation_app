@@ -8,6 +8,7 @@ import smtplib
 from pathlib import Path
 from utils import DataSession
 import time
+import datetime
 
 title_text = "### Text-Image Evaluation"
 chosen_one_label = "🔻"
@@ -77,7 +78,8 @@ def send_email(
     part = MIMEBase("application", "octet-stream")
     part.set_payload(json_attachment.encode("utf-8"))
     encoders.encode_base64(part)
-    part.add_header("Content-Disposition", f"attachment; filename=responses.json")
+    timestamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    part.add_header("Content-Disposition", f"attachment; filename={timestamp}.json")
     msg.attach(part)
 
     try:
