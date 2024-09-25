@@ -9,6 +9,7 @@ from pathlib import Path
 from utils import DataSession
 import time
 import datetime
+import random
 
 title_text = "### Text-Image Evaluation"
 chosen_one_label = "🔻"
@@ -167,9 +168,14 @@ def create_survey_page():
     images, prompt = st.session_state.dataset.get_data_question(
         st.session_state.current_question
     )
+    images = list(images.items())
+    if st.session_state.shuffle is None:
+        # argument des positions des images
+        st.session_state.shuffle = random.sample(range(n_images), n_images)
+    images = [images[i] for i in st.session_state.shuffle]
     DESCRIPITON.markdown(f"{text_question}")
     CAPTION.markdown(f"CAPTION : **{prompt}**")
-    for (i, col), (hash, image) in zip(enumerate(cols), images.items()):
+    for (i, col), (hash, image) in zip(enumerate(cols), images):
         with col:
             CAPTIONS[i] = st.markdown(f"", unsafe_allow_html=True)
             IMAGES[i] = st.image(image)
@@ -237,6 +243,7 @@ def submit_clicked():
             st.session_state[f"checkbox_{i}"] = False
         st.session_state.current_question += 1
         st.session_state.choice_val = None
+        st.session_state.shuffle = None
         if st.session_state.dataset.get_stop(st.session_state.current_question):
             st.session_state.end = True
 
@@ -267,6 +274,9 @@ else:
             path_wo_guidance=Path("data/wo_guidance_eval.h5"),
         )
         st.session_state.current_question = 0
+
+    if "shuffle" not in st.session_state:
+        st.session_state.shuffle = None
 
     if st.session_state.start and not st.session_state.end:
         create_survey_page()  # If the survey has started, show the survey page
