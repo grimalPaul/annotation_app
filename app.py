@@ -27,7 +27,8 @@ You will be presented with a description and multiples images. Your task is to s
 - You can select multiple images if you think they match the description equally well.
 - You can also not select any image if you think none of them match the description.
 
-You can zoom in the images by clicking on the arrows in the top right corner of the image.
+
+**Zooming in your browser is recommended to better visualize the images.** You can also zoom in the images by clicking on the arrows in the top right corner of the image when you hover over it.
 
 You will have two stages to complete.
 - First one where you will be presented only two images
@@ -114,7 +115,7 @@ def create_finish_page():
     DESCRIPITON.markdown(acknowledgment)
     CAPTION.markdown(warning)
     send_email(
-        subject="User Evaluation",
+        subject="[User Evaluation]",
         body=f"""Attached is the JSON file with the evaluation.\nAge: {st.session_state.age}, Expert: {st.session_state.expert}
         """,
         json_attachment=st.session_state.user_responses.to_json(orient="records"),
