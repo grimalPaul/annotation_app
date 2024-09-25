@@ -263,8 +263,8 @@ else:
         )
     if "dataset" not in st.session_state:
         st.session_state.dataset = DataSession(
-            path_guidance=Path("data/w_guidance_eval.pkl"),
-            path_wo_guidance=Path("data/wo_guidance_eval.pkl"),
+            path_guidance=Path("data/w_guidance_eval.h5"),
+            path_wo_guidance=Path("data/wo_guidance_eval.h5"),
         )
         st.session_state.current_question = 0
 

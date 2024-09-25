@@ -1,10 +1,24 @@
 import pandas as pd
 import numpy as np
+from cryptography.fernet import Fernet
+import streamlit as st
+
+
+def decrypted(path):
+    with open(path, "rb") as file:
+        encrypted_data = file.read()
+
+    cipher_suite = Fernet(st.secrets.access_credentials.filepwd.encode())
+    decrypted_data = cipher_suite.decrypt(encrypted_data)
+    with open("temp_data.h5", "wb") as file:
+        file.write(decrypted_data)
+    df = pd.read_hdf("temp_data.h5")
+    return df
 
 
 class Dataset:
     def __init__(self, path):
-        self.data = pd.read_pickle(path)
+        self.data = decrypted(path)
         self.n_images = len(self.data["images"].iloc[0])
 
     def get_nb_images(self):

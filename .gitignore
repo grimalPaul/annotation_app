@@ -168,3 +168,4 @@ user_results/*
 data_not_uploaded/*
 poetry.lock
 environment.yaml
+temp_data.h5

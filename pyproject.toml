@@ -11,6 +11,8 @@ streamlit = "^1.38.0"
 pandas = "^2.2.3"
 pysmt = "^0.9.6"
 numpy = "^2.1.1"
+cryptography = "^43.0.1"
+tables = "^3.10.1"
 
 [build-system]
 requires = ["poetry-core"]
