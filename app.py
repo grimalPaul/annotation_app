@@ -41,9 +41,9 @@ finish_indication = """ ### The End"""
 acknowledgment = "Thank you for your participation! 😊"
 warning = "**Please quit when the success message appears.**"
 login_indication = """### 🔒 Login to Access the App"""
-
 text_submit = "Continue"
-
+question_age = "What is yor age range?"
+question_expert = "Are you an expert in computer vision?"
 
 TITLE = st.empty()
 PROGRESSBAR = st.empty()
@@ -91,7 +91,12 @@ def send_email(
 
 
 def start_survey():
-    st.session_state.start = True
+    if st.session_state.age_radio is None or st.session_state.expert_radio is None:
+        st.toast("Please answer all questions before starting the survey")
+    else:
+        st.session_state.start = True
+        st.session_state.age = st.session_state.age_radio
+        st.session_state.expert = st.session_state.expert_radio
 
 
 def create_finish_page():
@@ -103,7 +108,8 @@ def create_finish_page():
     CAPTION.markdown(warning)
     send_email(
         subject="User Evaluation",
-        body="Attached is the JSON file with the evaluation",
+        body=f"""Attached is the JSON file with the evaluation.\nAge: {st.session_state.age}, Expert: {st.session_state.expert}
+        """,
         json_attachment=st.session_state.user_responses.to_json(orient="records"),
     )
 
@@ -111,7 +117,7 @@ def create_finish_page():
 def authenticate(password):
     if password == st.secrets.access_credentials.password:
         st.session_state.authenticated = True
-        st.success("You have successfully logged in!")
+        st.toast("You have successfully logged in!")
     else:
         st.error("Incorrect password. Please try again.")
 
@@ -175,6 +181,16 @@ def create_survey_page():
 
 def create_homepage():
     TITLE.markdown(homepage_indication, unsafe_allow_html=False)
+    DESCRIPITON.radio(
+        question_age,
+        ["< 18", "18-25", "26-35", "36-45", "46-55", "> 55"],
+        index=None,
+        key="age_radio",
+        horizontal=True,
+    )
+    CAPTION.radio(
+        question_expert, ["Yes", "No"], key="expert_radio", index=None, horizontal=True
+    )
     SUBMIT.button(label=text_submit, on_click=start_survey)
 
 
@@ -225,7 +241,10 @@ else:
     if "start" not in st.session_state:
         st.session_state.start = False
         st.session_state.end = False
-
+    if "age" not in st.session_state:
+        st.session_state.age = None
+    if "expert" not in st.session_state:
+        st.session_state.expert = None
     if "choice_val" not in st.session_state:
         st.session_state.choice_val = None  # To store selected image index
     if "user_responses" not in st.session_state:
