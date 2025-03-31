@@ -13,6 +13,8 @@ import random
 
 title_text = "### Text-Image Evaluation"
 chosen_one_label = "🔻"
+chosen_one_label = ""
+
 text_question = (
     "Which image(s) best matche(s) the description? Select all that apply or none."
 )
@@ -39,26 +41,40 @@ A progress bar will indicate your progress.
 Thank you for your participation! 😊
 """
 
-finish_indication = """ ### The End"""
-acknowledgment = "Thank you for your participation! 😊"
+finish_indication = """
+### The End
+"""
+acknowledgment = """Thank you for your participation! 😊
+Click on `Restart the survey` to annotate images.
+Images should be different from the ones you have already annotated, but some may be the same.
+"""
 warning = "**Please quit when the success message appears.**"
 login_indication = """### 🔒 Login to Access the App"""
 text_submit = "Continue"
 question_age = "What is yor age range?"
 question_expert = "Are you an expert in computer vision?"
 
+preference_question = (
+    "Which image do you prefer? You can select one or none. Reclick to unselect."
+)
+
 TITLE = st.empty()
 PROGRESSBAR = st.empty()
 DESCRIPITON = st.empty()
 CAPTION = st.empty()
-COLS = st.empty()
+COLSIMAGES = st.empty()
+DESCRIPITON_CHOICE = st.empty()
+COLSCHOICE = st.empty()
 CHECKBOX = {}
+
+DESCRIPITON_PREF = st.empty()
+RADIOPREF = st.empty()
+COLSPREF = st.empty()
+
 SUBMIT = st.empty()
 CAPTIONS = {}
 IMAGES = {}
 ID2HASH = {}
-
-
 NQUESTIONS = 6
 
 
@@ -138,7 +154,6 @@ def create_finish_page():
         age=st.session_state.age,
         expert=st.session_state.expert,
     )
-    # button restart
     SUBMIT.button(
         label="Restart the survey",
         on_click=restart_survey,
@@ -156,28 +171,27 @@ def authenticate(password):
 
 
 def update_choice_val():
-    choices = []
-    for i in range(
-        st.session_state.dataset.get_nb_images(st.session_state.current_question)
-    ):
-        if st.session_state[f"checkbox_{i}"]:
-            choices.append(i)
-    if len(choices) == 0:
-        choices.append(None)
-    st.session_state.choice_val = choices
+    if len(st.session_state.choice_semantic) == 0:
+        st.session_state.choice_val = [None]
+    else:
+        st.session_state.choice_val = st.session_state.choice_semantic
 
 
 def change_caption():
     update_choice_val()
-    n_images = st.session_state.dataset.get_nb_images(st.session_state.current_question)
-    for i in range(n_images):
-        if i is not None and i in st.session_state.choice_val:
-            CAPTIONS[i].markdown(
-                f"<div style='text-align: center'><{size_icon}>{chosen_one_label}</{size_icon}> </div>",
-                unsafe_allow_html=True,
-            )
-        else:
-            CAPTIONS[i].markdown(f"", unsafe_allow_html=True)
+    # n_images = st.session_state.dataset.get_nb_images(st.session_state.current_question)
+    # for i in range(n_images):
+    #     if i is not None and i in st.session_state.choice_val:
+    #         CAPTIONS[i].markdown(
+    #             f"<div style='text-align: center'><{size_icon}>{chosen_one_label}</{size_icon}> </div>",
+    #             unsafe_allow_html=True,
+    #         )
+    #     else:
+    #         CAPTIONS[i].markdown(f"", unsafe_allow_html=True)
+
+
+def update_preferences():
+    st.session_state.preference_val = st.session_state.radio_pref
 
 
 def create_survey_page():
@@ -186,7 +200,7 @@ def create_survey_page():
         st.session_state.current_question / st.session_state.dataset.get_nquestions()
     )
     n_images = st.session_state.dataset.get_nb_images(st.session_state.current_question)
-    cols = COLS.columns(n_images)
+
     images, prompt = st.session_state.dataset.get_data_question(
         st.session_state.current_question
     )
@@ -195,25 +209,66 @@ def create_survey_page():
         # argument des positions des images
         st.session_state.shuffle = random.sample(range(n_images), n_images)
     images = [images[i] for i in st.session_state.shuffle]
-    DESCRIPITON.markdown(f"{text_question}")
+    DESCRIPITON.markdown(f"")
     CAPTION.markdown(f"CAPTION : **{prompt}**")
-    for (i, col), (hash, image) in zip(enumerate(cols), images):
+    for (i, col), (hash, image) in zip(enumerate(COLSIMAGES.columns(n_images)), images):
+
+        ID2HASH[i] = hash
         with col:
-            CAPTIONS[i] = st.markdown(f"", unsafe_allow_html=True)
+            CAPTIONS[i] = st.markdown(
+                f"<div style='text-align: center'><{size_icon}>{i}</{size_icon}> </div>",
+                unsafe_allow_html=True,
+            )
             IMAGES[i] = st.image(image)
-            ID2HASH[i] = hash
-            _, subcol2 = st.columns(2)
-            with subcol2:
-                CHECKBOX[i] = st.container()
-                with CHECKBOX[i]:
-                    st.checkbox(
-                        label=f"{i}",
-                        value=False,
-                        key=f"checkbox_{i}",
-                        on_change=change_caption,
-                        label_visibility="collapsed",
-                    )
+    # DESCRIPITON_CHOICE.markdown(f"{text_question}")
+    COLSCHOICE.pills(
+        label=text_question,
+        options=[i for i in range(n_images)],
+        on_change=update_choice_val,
+        key="choice_semantic",
+        selection_mode="multi",
+    )
+
+    # for (i, col), (hash, image) in zip(enumerate(COLSCHOICE.columns(n_images)), images):
+    #     with col:
+    #         ID2HASH[i] = hash
+    #         COLSCHOICE.checkbox(
+    #             label=f"{i}",
+    #             value=False,
+    #             key=f"checkbox_{i}",
+    #             on_change=change_caption,
+    #             label_visibility="collapsed",
+    #         )
+    # _, subcol2 = st.columns(2)
+    # with subcol2:
+    #     CHECKBOX[i] = st.container()
+    #     with CHECKBOX[i]:
+    #         st.checkbox(
+    #             label=f"{i}",
+    #             value=False,
+    #             key=f"checkbox_{i}",
+    #             on_change=change_caption,
+    #             label_visibility="collapsed",
+    #         )
+
     change_caption()
+    RADIOPREF.pills(
+        label=preference_question,
+        options=[i for i in range(n_images)],
+        on_change=update_preferences,
+        key="radio_pref",
+        selection_mode="single",
+    )
+    # DESCRIPITON_PREF.markdown(preference_question)
+    # RADIOPREF.radio(
+    #     label=preference_question,
+    #     options=[i for i in range(n_images)] + [None],
+    #     index=n_images,
+    #     on_change=update_preferences,
+    #     horizontal=True,
+    #     key="radio_pref",
+    # )
+    update_preferences()
     SUBMIT.button(label=text_submit, on_click=submit_clicked)
 
 
@@ -245,11 +300,18 @@ def submit_clicked():
                 final_choices.append(ID2HASH[i])
             else:
                 final_choices.append(None)
+        final_choices_pref = []
+
+        if st.session_state.preference_val is not None:
+            final_choices_pref.append(ID2HASH[st.session_state.preference_val])
+        else:
+            final_choices_pref.append(st.session_state.preference_val)
         new_entry = pd.DataFrame(
             {
                 "stage": [stage],
                 "id_question": [id_question],
                 "choice": [final_choices],
+                "preference": [final_choices_pref],
             }
         )
         st.session_state.user_responses = pd.concat(
@@ -261,11 +323,14 @@ def submit_clicked():
         ):
             CAPTIONS[i].empty()
             IMAGES[i].empty()
-            CHECKBOX[i].empty()
-            st.session_state[f"checkbox_{i}"] = False
+            RADIOPREF.empty()
+            COLSCHOICE.empty()
         st.session_state.current_question += 1
         st.session_state.choice_val = None
+        st.session_state.preference_val = None
         st.session_state.shuffle = None
+        st.session_state.choice_semantic = []
+        st.session_state.radio_pref = None
         if st.session_state.dataset.get_stop(st.session_state.current_question):
             st.session_state.end = True
 
@@ -286,9 +351,12 @@ else:
         st.session_state.expert = None
     if "choice_val" not in st.session_state:
         st.session_state.choice_val = None  # To store selected image index
+
+    if "preference_val" not in st.session_state:
+        st.session_state.preference_val = None
     if "user_responses" not in st.session_state:
         st.session_state.user_responses = pd.DataFrame(
-            columns=["stage", "id_question", "choice"]
+            columns=["stage", "id_question", "choice", "preference"]
         )
     if "dataset" not in st.session_state:
         st.session_state.dataset = DataSession(
