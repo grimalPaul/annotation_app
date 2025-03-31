@@ -22,23 +22,25 @@ size_icon = "big"
 stage = ["one", "two"]
 
 homepage_indication = """
-# Welcome to the evaluation of the text-image generation evaluation! 🚀
+# Welcome to the Text-Image Evaluation! 🚀
 
-You will be presented with a description and multiples images. Your task is to select the images that best matches the description.
+You will see a description and multiple images.
 
-- You can select multiple images if you think they match the description equally well.
-- You can also not select any image if you think none of them match the description.
+Your task:
+1. Select all images that match the description. Choose none if no image matches.
+2. Pick your favorite image or none if you have no preference.
 
-**Zooming in your browser is recommended to better visualize the images.** You can also zoom in the images by clicking on the arrows in the top right corner of the image when you hover over it.
+**Tips:** 
+- Zoom your browser for better visibility.
+- Click the square in the top-right corner of an image to enlarge it.
 
-You will have two stages to complete.
-- First one where you will be presented 4 images
-- A second one where you will be presented 3 images. 
+The evaluation has two stages:
+1. Stage 1: 4 images per description.
+2. Stage 2: 3 images per description.
 
-During the completion of the evaluation, you will not be able to go back to previous questions.
-A progress bar will indicate your progress.
+You cannot revisit previous questions. A progress bar will track your progress.
 
-Thank you for your participation! 😊
+Thank you for participating! 😊
 """
 
 finish_indication = """
