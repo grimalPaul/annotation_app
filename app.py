@@ -109,6 +109,20 @@ def start_survey():
         st.session_state.expert = st.session_state.expert_radio
 
 
+def restart_survey():
+    st.session_state.user_responses = pd.DataFrame(
+        columns=["stage", "id_question", "choice"]
+    )
+    st.session_state.dataset = DataSession(
+        first_stage=Path("data/gsn_eval.h5"),
+        second_stage=Path("data/sd3_eval.h5"),
+        path_img="img",
+        n_questions=NQUESTIONS,
+    )
+    st.session_state.current_question = 0
+    st.session_state.end = False
+
+
 def create_finish_page():
     TITLE.markdown(finish_indication, unsafe_allow_html=False)
     PROGRESSBAR.progress(
@@ -123,6 +137,11 @@ def create_finish_page():
         json_attachment=st.session_state.user_responses.to_json(orient="records"),
         age=st.session_state.age,
         expert=st.session_state.expert,
+    )
+    # button restart
+    SUBMIT.button(
+        label="Restart the survey",
+        on_click=restart_survey,
     )
 
 
