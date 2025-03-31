@@ -5,6 +5,7 @@ import streamlit as st
 from PIL import Image
 from pathlib import Path
 import tarfile
+import io
 
 
 def decrypted(path):
@@ -62,7 +63,6 @@ class DataSession:
             }
         )
         self.path_img = Path(path_img)
-        # self.tar = tarfile.open("img.tar.gz", "r:gz")
         self.tar = tarfile.open("data/img.tar", "r:")
 
     def extract_image(self, image_name):
@@ -70,8 +70,10 @@ class DataSession:
         name_in_tar = "img/" + image_name
         if name_in_tar not in self.tar.getnames():
             raise ValueError(f"{name_in_tar} not in tar file")
-        self.tar.extract(name_in_tar, "img")
-        return Image.open("img/" + image_name)
+        f = self.tar.extractfile(name_in_tar)
+        if f is None:
+            raise ValueError(f"{name_in_tar} not in tar file")
+        return Image.open(io.BytesIO(f.read()))
 
     def get_stop(self, idx):
         return idx >= self.nquestions
