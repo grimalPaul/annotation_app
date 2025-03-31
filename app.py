@@ -17,7 +17,7 @@ text_question = (
     "Which image(s) best matche(s) the description? Select all that apply or none."
 )
 size_icon = "big"
-stage = ["wo_guidance", "w_guidance"]
+stage = ["one", "two"]
 
 homepage_indication = """
 # Welcome to the evaluation of the text-image generation evaluation! 🚀
@@ -27,12 +27,11 @@ You will be presented with a description and multiples images. Your task is to s
 - You can select multiple images if you think they match the description equally well.
 - You can also not select any image if you think none of them match the description.
 
-
 **Zooming in your browser is recommended to better visualize the images.** You can also zoom in the images by clicking on the arrows in the top right corner of the image when you hover over it.
 
 You will have two stages to complete.
-- First one where you will be presented only two images
-- A second one where you will be presented three images. 
+- First one where you will be presented 4 images
+- A second one where you will be presented 3 images. 
 
 During the completion of the evaluation, you will not be able to go back to previous questions.
 A progress bar will indicate your progress.
@@ -58,6 +57,9 @@ SUBMIT = st.empty()
 CAPTIONS = {}
 IMAGES = {}
 ID2HASH = {}
+
+
+NQUESTIONS = 6
 
 
 def send_email(
@@ -271,8 +273,10 @@ else:
         )
     if "dataset" not in st.session_state:
         st.session_state.dataset = DataSession(
-            path_guidance=Path("data/w_guidance_eval.h5"),
-            path_wo_guidance=Path("data/wo_guidance_eval.h5"),
+            first_stage=Path("data/gsn_eval.h5"),
+            second_stage=Path("data/sd3_eval.h5"),
+            path_img="img",
+            n_questions=NQUESTIONS,
         )
         st.session_state.current_question = 0
 
