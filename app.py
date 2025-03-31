@@ -63,13 +63,9 @@ PROGRESSBAR = st.empty()
 DESCRIPITON = st.empty()
 CAPTION = st.empty()
 COLSIMAGES = st.empty()
-DESCRIPITON_CHOICE = st.empty()
 COLSCHOICE = st.empty()
-CHECKBOX = {}
 
-DESCRIPITON_PREF = st.empty()
 RADIOPREF = st.empty()
-COLSPREF = st.empty()
 
 SUBMIT = st.empty()
 CAPTIONS = {}
@@ -177,19 +173,6 @@ def update_choice_val():
         st.session_state.choice_val = st.session_state.choice_semantic
 
 
-def change_caption():
-    update_choice_val()
-    # n_images = st.session_state.dataset.get_nb_images(st.session_state.current_question)
-    # for i in range(n_images):
-    #     if i is not None and i in st.session_state.choice_val:
-    #         CAPTIONS[i].markdown(
-    #             f"<div style='text-align: center'><{size_icon}>{chosen_one_label}</{size_icon}> </div>",
-    #             unsafe_allow_html=True,
-    #         )
-    #     else:
-    #         CAPTIONS[i].markdown(f"", unsafe_allow_html=True)
-
-
 def update_preferences():
     st.session_state.preference_val = st.session_state.radio_pref
 
@@ -228,30 +211,7 @@ def create_survey_page():
         key="choice_semantic",
         selection_mode="multi",
     )
-
-    # for (i, col), (hash, image) in zip(enumerate(COLSCHOICE.columns(n_images)), images):
-    #     with col:
-    #         ID2HASH[i] = hash
-    #         COLSCHOICE.checkbox(
-    #             label=f"{i}",
-    #             value=False,
-    #             key=f"checkbox_{i}",
-    #             on_change=change_caption,
-    #             label_visibility="collapsed",
-    #         )
-    # _, subcol2 = st.columns(2)
-    # with subcol2:
-    #     CHECKBOX[i] = st.container()
-    #     with CHECKBOX[i]:
-    #         st.checkbox(
-    #             label=f"{i}",
-    #             value=False,
-    #             key=f"checkbox_{i}",
-    #             on_change=change_caption,
-    #             label_visibility="collapsed",
-    #         )
-
-    change_caption()
+    update_choice_val()
     RADIOPREF.pills(
         label=preference_question,
         options=[i for i in range(n_images)],
@@ -259,15 +219,6 @@ def create_survey_page():
         key="radio_pref",
         selection_mode="single",
     )
-    # DESCRIPITON_PREF.markdown(preference_question)
-    # RADIOPREF.radio(
-    #     label=preference_question,
-    #     options=[i for i in range(n_images)] + [None],
-    #     index=n_images,
-    #     on_change=update_preferences,
-    #     horizontal=True,
-    #     key="radio_pref",
-    # )
     update_preferences()
     SUBMIT.button(label=text_submit, on_click=submit_clicked)
 
