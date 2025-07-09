@@ -6,22 +6,126 @@ from email.mime.text import MIMEText
 import pandas as pd
 import smtplib
 from pathlib import Path
-from utils import DataSession
 import time
 import datetime
 import random
+import tarfile
+import numpy as np
 
-title_text = "### Text-Image Evaluation"
-chosen_one_label = "🔻"
-chosen_one_label = ""
 
-text_question = (
-    "Which image(s) best matche(s) the description? Select all that apply or none."
+class Dataset:
+    """
+    Handles loading and accessing data from a single H5 dataset.
+    """
+
+    def __init__(self, path):
+        self.data = pd.read_hdf(path)
+        self.n_images = len(self.data["images"].iloc[0])
+
+    def get_nb_images(self):
+        """Returns the number of images per question in this dataset."""
+        return self.n_images
+
+    def get_data(self, idx):
+        """
+        Retrieves image references (e.g., filenames) and prompt for a given question ID.
+        Returns the raw image references (e.g., dictionary of {hash: filename}) and the prompt string.
+        """
+        return self.data[self.data["id_question"] == idx][["images", "prompt"]].values[
+            0
+        ]
+
+    def get_ids_question(self):
+        """Returns a list of all unique question IDs in this dataset."""
+        return self.data["id_question"].tolist()
+
+
+class DataSession:
+    """
+    Manages the overall survey data, including multiple stages and image extraction from a tar file.
+    """
+
+    def __init__(
+        self,
+        first_stage: Path,
+        second_stage: Path,
+        path_img: str,
+        n_questions: int = -1,
+    ):
+        self.n_questions_per_stage = n_questions
+        self.dataset = {
+            0: Dataset(first_stage),
+            1: Dataset(second_stage),
+        }
+        self.question_order = {
+            0: np.random.permutation(self.dataset[0].get_ids_question())[
+                : self.n_questions_per_stage
+            ],
+            1: np.random.permutation(self.dataset[1].get_ids_question())[
+                : self.n_questions_per_stage
+            ],
+        }
+        self.total_nquestions = len(self.question_order[0]) + len(
+            self.question_order[1]
+        )
+        self.question_number2stageandindex = {
+            i: (0, j) for i, j in enumerate(self.question_order[0])
+        }
+        self.question_number2stageandindex.update(
+            {
+                i + len(self.question_order[0]): (1, j)
+                for i, j in enumerate(self.question_order[1])
+            }
+        )
+        self.path_img = Path(path_img)
+        try:
+            self.tar = tarfile.open("data/img.tar", "r:")
+        except tarfile.ReadError as e:
+            st.error(
+                f"Error opening tar file 'data/img.tar': {e}. Please ensure it exists and is not corrupted."
+            )
+            self.tar = None
+
+    def extract_image(self, image_name: str) -> bytes:
+        if self.tar is None:
+            raise ValueError("Tar file not loaded. Cannot extract image.")
+        name_in_tar = "img/" + image_name
+        if name_in_tar not in self.tar.getnames():
+            raise ValueError(f"'{name_in_tar}' not found in tar file.")
+        f = self.tar.extractfile(name_in_tar)
+        if f is None:
+            raise ValueError(f"Could not extract '{name_in_tar}' from tar file.")
+        return f.read()
+
+    def get_stop(self, current_question_idx: int) -> bool:
+        return current_question_idx >= self.total_nquestions
+
+    def get_nb_images(self, current_question_idx: int) -> int:
+        stage, _ = self.question_number2stageandindex[current_question_idx]
+        return self.dataset[stage].get_nb_images()
+
+    def get_data_question(
+        self, current_question_idx: int
+    ) -> tuple[dict[str, bytes], str]:
+        stage, dataset_idx = self.question_number2stageandindex[current_question_idx]
+        image_references, prompt = self.dataset[stage].get_data(dataset_idx)
+        images_data = {k: self.extract_image(v) for k, v in image_references.items()}
+        return images_data, prompt
+
+    def get_stage_idquestion(self, current_question_idx: int) -> tuple[int, int]:
+        return self.question_number2stageandindex[current_question_idx]
+
+    def get_nquestions(self) -> int:
+        return self.total_nquestions
+
+
+# --- UI Constants ---
+TITLE_TEXT = "### Text-Image Evaluation"
+TEXT_QUESTION = (
+    "Which image(s) best match(es) the description? Select all that apply or none."
 )
-size_icon = "big"
-stage = ["one", "two"]
-
-homepage_indication = """
+PREFERENCE_QUESTION = "Which image do you prefer?"
+HOMEPAGE_INDICATION = """
 # Welcome to the Text-Image Evaluation! 🚀
 
 You will see a description and multiple images.
@@ -30,7 +134,7 @@ Your task:
 1. Select all images that match the description. Choose none if no image matches.
 2. Pick your favorite image or none if you have no preference.
 
-**Tips:** 
+**Tips:**
 - Zoom your browser for better visibility.
 - Click the square in the top-right corner of an image to enlarge it.
 
@@ -42,290 +146,320 @@ You cannot revisit previous questions. A progress bar will track your progress.
 
 Thank you for participating! 😊
 """
+FINISH_INDICATION = "### Survey Complete! 🎉"
+ACKNOWLEDGMENT = """
+Thank you for your participation! 😊
+Your responses have been recorded. Click the button below to start a new session
+if you'd like to annotate more images.
 
-finish_indication = """
-### The End
+**Please close this tab when you see the success message.**
 """
-acknowledgment = """Thank you for your participation! 😊
-Click on `Restart the survey` to annotate images.
-Images should be different from the ones you have already annotated, but some may be the same.
-"""
-warning = "**Please quit when the success message appears.**"
-login_indication = """### 🔒 Login to Access the App"""
-text_submit = "Continue"
-question_age = "What is yor age range?"
-question_expert = "Are you an expert in computer vision?"
-
-preference_question = (
-    "Which image do you prefer? You can select one or none. Reclick to unselect."
-)
-
-TITLE = st.empty()
-PROGRESSBAR = st.empty()
-DESCRIPITON = st.empty()
-CAPTION = st.empty()
-COLSIMAGES = st.empty()
-COLSCHOICE = st.empty()
-
-RADIOPREF = st.empty()
-
-SUBMIT = st.empty()
-CAPTIONS = {}
-IMAGES = {}
-ID2HASH = {}
-NQUESTIONS = 6
+LOGIN_INDICATION = "### 🔒 Login to Access the App"
+SUBMIT_BUTTON_TEXT = "Continue"
+QUESTION_AGE = "What is your age range?"
+QUESTION_EXPERT = "Are you an expert in computer vision?"
+NQUESTIONS_PER_STAGE = 6
 
 
-def send_email(
-    subject,
-    body,
-    json_attachment,
-    age,
-    expert,
-):
-
-    email_from = st.secrets.email_credentials.email_from
-    password = st.secrets.email_credentials.password
-    smtp_server = st.secrets.email_credentials.smtp_server
-    smtp_port = st.secrets.email_credentials.smtp_port
-    email_to = st.secrets.email_credentials.email_to
-    msg = MIMEMultipart()
-    msg["From"] = email_from
-    msg["To"] = email_to
-    msg["Subject"] = subject
-
-    msg.attach(MIMEText(body, "plain"))
-    part = MIMEBase("application", "octet-stream")
-    part.set_payload(json_attachment.encode("utf-8"))
-    encoders.encode_base64(part)
-    filename = (
-        datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + f"_{age}_{expert}"
-    )
-    part.add_header("Content-Disposition", f"attachment; filename={filename}.json")
-    msg.attach(part)
-
+# --- Email Sending Function ---
+def send_email(subject, body, json_attachment, age, expert):
     try:
+        email_from = st.secrets.email_credentials.email_from
+        password = st.secrets.email_credentials.password
+        smtp_server = st.secrets.email_credentials.smtp_server
+        smtp_port = st.secrets.email_credentials.smtp_port
+        email_to = st.secrets.email_credentials.email_to
+
+        msg = MIMEMultipart()
+        msg["From"] = email_from
+        msg["To"] = email_to
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(json_attachment.encode("utf-8"))
+        encoders.encode_base64(part)
+        filename = (
+            datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + f"_{age}_{expert}"
+        )
+        part.add_header("Content-Disposition", f"attachment; filename={filename}.json")
+        msg.attach(part)
+
         with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
             server.login(email_from, password)
             server.sendmail(email_from, email_to, msg.as_string())
-        st.success(f"Data saved, thanks")
+        st.success("Data saved successfully! Thank you for your participation.")
         st.balloons()
+        return True
     except Exception as e:
         st.error(f"Error during saving: {e}")
+        return False
+
+
+# --- Session State Management ---
+def initialize_session_state():
+    defaults = {
+        "authenticated": False,
+        "start": False,
+        "end": False,
+        "age": None,
+        "expert": None,
+        "user_responses": pd.DataFrame(
+            columns=["stage", "id_question", "choice", "preference"]
+        ),
+        "dataset": None,
+        "current_question": 0,
+        "shuffle": None,
+        "choice_semantic_pills": [],
+        "radio_pref_choice": "None",
+        "id_to_hash_map": {},
+        "email_sent_flag": False,
+        "login_message_placeholder": None,  # Added for dynamic messages on login page
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 
 def start_survey():
-    if st.session_state.age_radio is None or st.session_state.expert_radio is None:
-        st.toast("Please answer all questions before starting the survey")
-    else:
-        st.session_state.start = True
-        st.session_state.age = st.session_state.age_radio
-        st.session_state.expert = st.session_state.expert_radio
+    if (
+        st.session_state.get("age_radio") is None
+        or st.session_state.get("expert_radio") is None
+    ):
+        st.error("Please answer all questions before starting the survey.")
+        return
+
+    st.session_state.start = True
+    st.session_state.age = st.session_state.age_radio
+    st.session_state.expert = st.session_state.expert_radio
+    st.session_state.dataset = DataSession(
+        first_stage=Path("data/gsn_eval.h5"),
+        second_stage=Path("data/sd3_eval.h5"),
+        path_img="img",
+        n_questions=NQUESTIONS_PER_STAGE,
+    )
+    # Rerun to transition to the survey page
+    st.rerun()
 
 
 def restart_survey():
     st.session_state.user_responses = pd.DataFrame(
-        columns=["stage", "id_question", "choice"]
+        columns=["stage", "id_question", "choice", "preference"]
     )
     st.session_state.dataset = DataSession(
         first_stage=Path("data/gsn_eval.h5"),
         second_stage=Path("data/sd3_eval.h5"),
         path_img="img",
-        n_questions=NQUESTIONS,
+        n_questions=NQUESTIONS_PER_STAGE,
     )
     st.session_state.current_question = 0
     st.session_state.end = False
+    st.session_state.shuffle = None
+    st.session_state.choice_semantic_pills = []
+    st.session_state.radio_pref_choice = "None"
+    st.session_state.id_to_hash_map = {}
+    st.session_state.email_sent_flag = False
+    st.rerun()
 
 
-def create_finish_page():
-    TITLE.markdown(finish_indication, unsafe_allow_html=False)
-    PROGRESSBAR.progress(
-        st.session_state.current_question / st.session_state.dataset.get_nquestions()
-    )
-    DESCRIPITON.markdown(acknowledgment)
-    CAPTION.markdown(warning)
-    send_email(
-        subject="[User Evaluation]",
-        body=f"""Attached is the JSON file with the evaluation.\nAge: {st.session_state.age}, Expert: {st.session_state.expert}
-        """,
-        json_attachment=st.session_state.user_responses.to_json(orient="records"),
-        age=st.session_state.age,
-        expert=st.session_state.expert,
-    )
-    SUBMIT.button(
-        label="Restart the survey",
-        on_click=restart_survey,
-    )
+def handle_login_submission():
+    """
+    Handles authentication and manages the UI feedback for correct/incorrect password.
+    This function will be called directly in the form's submission block.
+    """
+    password_input = st.session_state.password_input_field
 
-
-def authenticate(password):
-    if password == st.secrets.access_credentials.password:
+    if password_input == st.secrets.access_credentials.password:
+        # Correct password: Set authenticated and force rerun
         st.session_state.authenticated = True
-        st.toast("You have successfully logged in!")
+        st.success("You have successfully logged in!")
+        st.rerun()  # Force an immediate rerun to switch to the homepage
     else:
-        with st.spinner("Authenticating..."):
-            time.sleep(5)
-        st.error("Incorrect password. Please try again.")
+        # Incorrect password: Show spinner, then error message
+        # Use the placeholder created in create_login_page
+        if st.session_state.login_message_placeholder:
+            with st.session_state.login_message_placeholder:
+                with st.spinner("Authenticating..."):
+                    time.sleep(2)  # Simulate work/delay for wrong password
+                st.error("Incorrect password. Please try again.")
 
 
-def update_choice_val():
-    if len(st.session_state.choice_semantic) == 0:
-        st.session_state.choice_val = [None]
-    else:
-        st.session_state.choice_val = st.session_state.choice_semantic
+def submit_question_response():
+    selected_semantic_indices = st.session_state.choice_semantic_pills
+    selected_preference_value = st.session_state.radio_pref_choice
 
-
-def update_preferences():
-    st.session_state.preference_val = st.session_state.radio_pref
-
-
-def create_survey_page():
-    TITLE.markdown(title_text, unsafe_allow_html=False)
-    PROGRESSBAR.progress(
-        st.session_state.current_question / st.session_state.dataset.get_nquestions()
-    )
-    n_images = st.session_state.dataset.get_nb_images(st.session_state.current_question)
-
-    images, prompt = st.session_state.dataset.get_data_question(
+    stage, id_question = st.session_state.dataset.get_stage_idquestion(
         st.session_state.current_question
     )
-    images = list(images.items())
-    if st.session_state.shuffle is None:
-        # argument des positions des images
-        st.session_state.shuffle = random.sample(range(n_images), n_images)
-    images = [images[i] for i in st.session_state.shuffle]
-    DESCRIPITON.markdown(f"")
-    CAPTION.markdown(f"CAPTION : **{prompt}**")
-    for (i, col), (hash, image) in zip(enumerate(COLSIMAGES.columns(n_images)), images):
 
-        ID2HASH[i] = hash
-        with col:
-            CAPTIONS[i] = st.markdown(
-                f"<div style='text-align: center'><{size_icon}>{i}</{size_icon}> </div>",
-                unsafe_allow_html=True,
-            )
-            IMAGES[i] = st.image(image)
-    # DESCRIPITON_CHOICE.markdown(f"{text_question}")
-    COLSCHOICE.pills(
-        label=text_question,
-        options=[i for i in range(n_images)],
-        on_change=update_choice_val,
-        key="choice_semantic",
-        selection_mode="multi",
+    if not selected_semantic_indices:
+        final_choices = [None]
+    else:
+        final_choices = [
+            st.session_state.id_to_hash_map[idx] for idx in selected_semantic_indices
+        ]
+
+    if selected_preference_value == "None":
+        final_preference = None
+    else:
+        pref_index = int(selected_preference_value)
+        final_preference = st.session_state.id_to_hash_map.get(pref_index)
+
+    new_entry = pd.DataFrame(
+        {
+            "stage": [stage],
+            "id_question": [id_question],
+            "choice": [final_choices],
+            "preference": [final_preference],
+        }
     )
-    update_choice_val()
-    RADIOPREF.pills(
-        label=preference_question,
-        options=[i for i in range(n_images)],
-        on_change=update_preferences,
-        key="radio_pref",
-        selection_mode="single",
+    st.session_state.user_responses = pd.concat(
+        [st.session_state.user_responses, new_entry], ignore_index=True
     )
-    update_preferences()
-    SUBMIT.button(label=text_submit, on_click=submit_clicked)
+
+    st.session_state.current_question += 1
+    st.session_state.shuffle = None
+    st.session_state.choice_semantic_pills = []
+    st.session_state.radio_pref_choice = "None"
+    st.session_state.id_to_hash_map = {}
+
+    if st.session_state.dataset.get_stop(st.session_state.current_question):
+        st.session_state.end = True
+
+    # st.rerun()  # Rerun to update the page after submission
+
+
+# --- UI Page Functions ---
+def create_login_page():
+    st.markdown(LOGIN_INDICATION)
+    with st.form("login_form"):
+        password = st.text_input(
+            "Enter the password", type="password", key="password_input_field"
+        )
+        submitted = st.form_submit_button("Login")
+
+        # Create a placeholder at the top level of the login page function
+        if (
+            "login_message_placeholder" not in st.session_state
+            or st.session_state.login_message_placeholder is None
+        ):
+            st.session_state.login_message_placeholder = st.empty()
+
+        if submitted:
+            handle_login_submission()  # Call the function that handles login and rerun
 
 
 def create_homepage():
-    TITLE.markdown(homepage_indication, unsafe_allow_html=False)
-    DESCRIPITON.radio(
-        question_age,
-        ["-18", "18-25", "26-35", "36-45", "46-55", "+55"],
-        index=None,
-        key="age_radio",
+    st.markdown(HOMEPAGE_INDICATION)
+    with st.form("user_info_form"):
+        st.radio(
+            QUESTION_AGE,
+            ["-18", "18-25", "26-35", "36-45", "46-55", "+55"],
+            index=None,
+            key="age_radio",
+            horizontal=True,
+        )
+        st.radio(
+            QUESTION_EXPERT,
+            ["Yes", "No"],
+            key="expert_radio",
+            index=None,
+            horizontal=True,
+        )
+        submitted = st.form_submit_button(SUBMIT_BUTTON_TEXT)
+        if submitted:
+            start_survey()
+
+
+def create_survey_page():
+    st.markdown(TITLE_TEXT)
+    progress_value = (
+        st.session_state.current_question / st.session_state.dataset.get_nquestions()
+    )
+    st.progress(
+        progress_value,
+        text=f"Progress: {st.session_state.current_question}/{st.session_state.dataset.get_nquestions()}",
+    )
+
+    n_images = st.session_state.dataset.get_nb_images(st.session_state.current_question)
+    images_raw, prompt = st.session_state.dataset.get_data_question(
+        st.session_state.current_question
+    )
+    images_list = list(images_raw.items())
+
+    if st.session_state.shuffle is None:
+        st.session_state.shuffle = random.sample(range(n_images), n_images)
+
+    shuffled_images = [images_list[i] for i in st.session_state.shuffle]
+    st.session_state.id_to_hash_map = {
+        i: shuffled_images[i][0] for i in range(n_images)
+    }
+
+    st.markdown(f"**Caption:** {prompt}")
+
+    cols = st.columns(n_images)
+    for i, col in enumerate(cols):
+        with col:
+            st.markdown(
+                f"<div style='text-align: center; font-size: 20px; font-weight: bold;'>{i}</div>",
+                unsafe_allow_html=True,
+            )
+            st.image(shuffled_images[i][1], use_container_width=True)
+
+    st.pills(
+        label=TEXT_QUESTION,
+        options=[i for i in range(n_images)],
+        key="choice_semantic_pills",
+        selection_mode="multi",
+    )
+
+    radio_options = ["None"] + [str(i) for i in range(n_images)]
+    st.radio(
+        label=PREFERENCE_QUESTION,
+        options=radio_options,
+        index=0,
+        key="radio_pref_choice",
         horizontal=True,
     )
-    CAPTION.radio(
-        question_expert, ["Yes", "No"], key="expert_radio", index=None, horizontal=True
+
+    st.button(
+        label=SUBMIT_BUTTON_TEXT, on_click=submit_question_response, type="primary"
     )
-    SUBMIT.button(label=text_submit, on_click=start_survey)
 
 
-def submit_clicked():
-    if st.session_state.choice_val is None:
-        st.error("Please answer the question before submitting")
-    else:
-        stage, id_question = st.session_state.dataset.get_stage_idquestion(
-            st.session_state.current_question
-        )
-        final_choices = []
-        for i in st.session_state.choice_val:
-            if i is not None:
-                final_choices.append(ID2HASH[i])
-            else:
-                final_choices.append(None)
-        final_choices_pref = []
+def create_finish_page():
+    st.markdown(FINISH_INDICATION)
+    st.progress(1.0, text="Survey Complete!")
+    st.markdown(ACKNOWLEDGMENT)
 
-        if st.session_state.preference_val is not None:
-            final_choices_pref.append(ID2HASH[st.session_state.preference_val])
-        else:
-            final_choices_pref.append(st.session_state.preference_val)
-        new_entry = pd.DataFrame(
-            {
-                "stage": [stage],
-                "id_question": [id_question],
-                "choice": [final_choices],
-                "preference": [final_choices_pref],
-            }
-        )
-        st.session_state.user_responses = pd.concat(
-            [st.session_state.user_responses, new_entry], ignore_index=True
-        )
-
-        for i in range(
-            st.session_state.dataset.get_nb_images(st.session_state.current_question)
+    if st.session_state.get("email_sent_flag", False) is False:
+        if send_email(
+            subject="[User Evaluation Results]",
+            body=f"Evaluation completed.\nAge: {st.session_state.age}\nExpert: {st.session_state.expert}",
+            json_attachment=st.session_state.user_responses.to_json(orient="records"),
+            age=st.session_state.age,
+            expert=st.session_state.expert,
         ):
-            CAPTIONS[i].empty()
-            IMAGES[i].empty()
-            RADIOPREF.empty()
-            COLSCHOICE.empty()
-        st.session_state.current_question += 1
-        st.session_state.choice_val = None
-        st.session_state.preference_val = None
-        st.session_state.shuffle = None
-        st.session_state.choice_semantic = []
-        st.session_state.radio_pref = None
-        if st.session_state.dataset.get_stop(st.session_state.current_question):
-            st.session_state.end = True
+            st.session_state.email_sent_flag = True
+
+    st.button(label="Start New Session", on_click=restart_survey, type="secondary")
+    # print dataframe
+    print(st.session_state.user_responses)
 
 
-if "authenticated" not in st.session_state or not st.session_state.authenticated:
-    st.session_state.authenticated = False
-    TITLE.markdown(login_indication, unsafe_allow_html=False)
-    password = DESCRIPITON.text_input("Enter the password", type="password")
-    SUBMIT.button(label="Submit", on_click=authenticate, args=(password,))
+# --- Main Application Flow ---
+def main():
+    initialize_session_state()
 
-else:
-    if "start" not in st.session_state:
-        st.session_state.start = False
-        st.session_state.end = False
-    if "age" not in st.session_state:
-        st.session_state.age = None
-    if "expert" not in st.session_state:
-        st.session_state.expert = None
-    if "choice_val" not in st.session_state:
-        st.session_state.choice_val = None  # To store selected image index
-
-    if "preference_val" not in st.session_state:
-        st.session_state.preference_val = None
-    if "user_responses" not in st.session_state:
-        st.session_state.user_responses = pd.DataFrame(
-            columns=["stage", "id_question", "choice", "preference"]
-        )
-    if "dataset" not in st.session_state:
-        st.session_state.dataset = DataSession(
-            first_stage=Path("data/gsn_eval.h5"),
-            second_stage=Path("data/sd3_eval.h5"),
-            path_img="img",
-            n_questions=NQUESTIONS,
-        )
-        st.session_state.current_question = 0
-
-    if "shuffle" not in st.session_state:
-        st.session_state.shuffle = None
-
-    if st.session_state.start and not st.session_state.end:
-        create_survey_page()  # If the survey has started, show the survey page
+    if not st.session_state.authenticated:
+        create_login_page()
+    elif not st.session_state.start:
+        create_homepage()
     elif st.session_state.end:
         create_finish_page()
     else:
-        create_homepage()  # Otherwise, show the homepage
+        create_survey_page()
+
+
+if __name__ == "__main__":
+    main()
