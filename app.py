@@ -139,8 +139,8 @@ Your task:
 - Click the square in the top-right corner of an image to enlarge it.
 
 The evaluation has two stages:
-1. Stage 1: 4 images per description.
-2. Stage 2: 3 images per description.
+1. Stage 1: 3 images per description.
+2. Stage 2: 2 images per description.
 
 You cannot revisit previous questions. A progress bar will track your progress.
 
