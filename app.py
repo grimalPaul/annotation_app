@@ -259,7 +259,6 @@ def restart_survey():
     st.session_state.radio_pref_choice = "None"
     st.session_state.id_to_hash_map = {}
     st.session_state.email_sent_flag = False
-    st.rerun()
 
 
 def handle_login_submission():
